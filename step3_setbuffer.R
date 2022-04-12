@@ -6,24 +6,8 @@ library(raster)    # for raster objects
 library(readr)
 library(rgeos)
 
-# set working directory
-#setwd(dirname(rstudioapi::getSourceEditorContext()$path))
-setwd("/Volumes/GoogleDrive/My Drive/Graduate School/GSP_Analy/Organized_CnD/")
-
-# set coordinate reference system
-merc <- crs("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0
-+k=1.0 +units=m +nadgrids=@null +no_defs")
-
-# load data
-gsp <- st_read("Output/gsps_with_region.shp")
-gsp <- filter(gsp, region!="Central Valley" & GSP_Name != "Las Posas") %>% st_transform(., merc)
-gsp <- as_Spatial(gsp) 
-gsp <- spTransform(gsp, merc)
-
-ds <- read_rds("Output/all_mts.rds") 
-ds <- spTransform(ds, merc)
-
-dcv <- st_intersection(ds, gsp)
+# take output from previous script into this one - we want domestic wells intersected with gsps
+domesticwells_in_gsps
 
 miles_to_meters <- function(x){x * 1609.34}
 # township level accuracy (36 square miles)
@@ -33,22 +17,22 @@ buffer_intersect_sf <- function(x) {
   # calculate the buffer
   x = st_buffer(x, dist = bt)
   # trim the buffer to the cv
-  x = st_intersection(x, gsp)
+  x = st_intersection(x, gsps)
   return(x) # return result
 }
 
-blist <- st_buffer(ds, dist=bt)
-blist <- as_Spatial(blist)
-blist <- raster::union(blist)
-blist <- as(blist, "sf")
+blist <- st_buffer(domesticwells_in_gsps, dist=bt)
+blist1 <- st_union(blist)
+
+st_write(blist1, "Boundaries/domesticwellbuffer.shp")
 
 ggplot() +
-  geom_sf(data=blist, col="grey10")+
-  geom_sf(data=ds, col="cornflowerblue", cex=.1) +
+  geom_sf(data=blist1, col="grey10")+
+  geom_sf(data=domesticwells_in_gsps, col="cornflowerblue", cex=.1) +
   theme_void()
 
 # subset points to gsp area
-dcv <- ds[gsp, ] 
+dcv <- ds[gsps, ] 
 
 plot(gsp)
 points(dcv, cex=.2)

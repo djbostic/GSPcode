@@ -5,33 +5,26 @@ library(raster)    # for raster objects
 library(sf)
 library(readr)
 library(gstat)
+library(rgdal)
 
 # set working directory
-setwd(dirname(rstudioapi::getSourceEditorContext()$path))
-#setwd("/Volumes/GoogleDrive/My Drive/Graduate School/GSP_Analy/Organized_CnD/")
-
-# set coordinate reference system
-merc <- crs("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0
-            +k=1.0 +units=m +nadgrids=@null +no_defs")
-
 # load data
 # shapefile names
-fall <- list.files("4Interpolation/Data/Fall_2018_Elevation_Points/", pattern = "\\.shp$")
-spring <- list.files("4Interpolation/Data/Spring_2018_Elevation_Points/", pattern = "\\.shp$")
+fall <- list.files("InterpolationGWLevels/drive-download-20220412T055017Z-001/Fall_2018_Elevation_Points/", pattern = "\\.shp$")
+spring <- list.files("InterpolationGWLevels/drive-download-20220412T055017Z-001/Spring_2018_Elevation_Points/", pattern = "\\.shp$")
 
 # data list
-falll = shapefile(file.path("4Interpolation/Data/Fall_2018_Elevation_Points/", fall))
-springg = shapefile(file.path("4Interpolation/Data/Spring_2018_Elevation_Points/", spring))
+falll = shapefile(file.path("InterpolationGWLevels/drive-download-20220412T055017Z-001/Fall_2018_Elevation_Points/", fall))
+springg = shapefile(file.path("InterpolationGWLevels/drive-download-20220412T055017Z-001/Spring_2018_Elevation_Points/", spring))
 
 f <- spTransform(falll, merc) # change the crs of each points dataframe
 sp <- spTransform(springg, merc)
 
 # GSP outline
-interp_boundary <- read_rds("Data/interpolation_buffer.rds")
+interp_boundary <- as_Spatial(blist1)
 interp_boundary <- spTransform(interp_boundary, merc) # transform central valley shapefile
 plot(interp_boundary)
 
-gsps <- shapefile("Data/All_CO_GSPs.shp")
 #### interpolation ####
 
 ### fall ###
@@ -93,14 +86,15 @@ g <- as(r, "SpatialGrid") # convert raster to spatial grid object
                  width = 5000)    # lag distance
   
   fve_f <- fit.variogram(v_f,         # takes `gstatVariogram` object
-                       vgm(0.8,   # partial sill: semivariance at the range
+                       vgm(15,   # partial sill: semivariance at the range
                            "Exp",     # linear model type
                            100000,    # range: distance where model first flattens out
-                           0.18))      # nugget
+                           0.25))      # nugget
   
   # plot variogram and fit
   plot(v_f, fve_f, xlab = 'Distance (m)', main = "FA 2018 Variogram")
   
+  crs(g) <- crs(f_cv)
   # ordinary kriging 
   kp_f <- krige(DGBS ~ 1, f_cv, g, model = fve_f)
   
@@ -124,7 +118,7 @@ g <- as(r, "SpatialGrid") # convert raster to spatial grid object
 plot(ok_f$Prediction)
 ok_f$ci_upper <- ok_f$Prediction + (1.96 * sqrt(ok_f$Variance))
 ok_f$ci_lower <- ok_f$Prediction - (1.96 * sqrt(ok_f$Variance))
-#readr::write_rds(ok_f, "Output/fall18_interp_allcobs.rds")
+readr::write_rds(ok_f, "InterpolationGWLevels/fall18_interp_allcobs.rds")
   
 #### SPRING 18 KRIGING ####
     gs_sp <- gstat(formula = DGBS ~ 1, # spatial data, so fitting xy as idp vars
@@ -165,11 +159,11 @@ ok_f$ci_lower <- ok_f$Prediction - (1.96 * sqrt(ok_f$Variance))
 plot(ok_sp$Prediction)
 ok_sp$ci_upper <- ok_sp$Prediction + (1.96 * sqrt(ok_sp$Variance))
 ok_sp$ci_lower <- ok_sp$Prediction - (1.96 * sqrt(ok_sp$Variance))
-#readr::write_rds(ok_sp, "Output/spring18_interp_allcobs.rds")
+readr::write_rds(ok_sp, "InterpolationGWLevels/spring18_interp_allcobs.rds")
 
 #### FALL AND SPRING 2019 KRIGING ####
-d  <- read_csv("4Interpolation/Data/Fall_Spring_2019_InterpolationPoints/measurements.csv")
-d2 <- read_csv("4Interpolation/Data/Fall_Spring_2019_InterpolationPoints/stations.csv")
+d  <- read_csv("InterpolationGWLevels/drive-download-20220412T055017Z-001/Fall_Spring_2019_InterpolationPoints/measurements.csv")
+d2 <- read_csv("InterpolationGWLevels/drive-download-20220412T055017Z-001/Fall_Spring_2019_InterpolationPoints/stations.csv")
 
 # subset measurements to 2019
 d <- filter(d, lubridate::year(MSMT_DATE) == 2019) %>% 
@@ -225,6 +219,7 @@ pcv <- pcv[-s1, ]
 # log transform Depth Below Ground Surface 
 pcv@data$mean_gwl_log <- log(pcv@data$mean_gwl)
 
+library(automap)
 plot(autofitVariogram(mean_gwl_log~1, pcv))
 
 gs <- gstat(formula = mean_gwl_log ~ 1, # spatial data, so fitting xy as idp vars
@@ -267,10 +262,11 @@ names(ok_19) <- c('Prediction', 'Variance') # name the raster layers in brick
 plot(ok_19$Prediction)
 ok_19$ci_upper <- ok_19$Prediction + (1.96 * sqrt(ok_19$Variance))
 ok_19$ci_lower <- ok_19$Prediction - (1.96 * sqrt(ok_19$Variance))
-#readr::write_rds(ok_19, "Output/FSP19_interpolation_allcobs.rds")
+readr::write_rds(ok_19, "InterpolationGWLevels/FSP19_interpolation_allcobs.rds")
 
 #### Average 2018 2019 groundwater level predictions ####
 d_avg <- mean(ok_f$Prediction, ok_sp$Prediction, ok_19$Prediction)
+readr::write_rds(d_avg, "InterpolationGWLevels/cgwl_raster.rds")
 
 pal <- colorRampPalette(c("cornflowerblue","red"))
 plot(d_avg, col = pal(6), main = "Mean WSE \n2018 - 2019", axes=FALSE, box=FALSE)
@@ -280,7 +276,9 @@ plot(gsps, add=T)
 
 #### Interpolate MTs ####
 # subset pts to the central valley polygon
-mt <- read_rds("Data/all_mts.rds")
+mt$MT_dtw <- as.numeric(mt$MT_dtw) 
+mt@data <- filter(mt@data, MT_dtw > 0)
+
 subset_gsp_outline <- function(x){x[interp_boundary, ]}
 mt_gsp_outline <- subset_gsp_outline(mt) 
 
@@ -354,14 +352,12 @@ ok_mt$ci_upper <- ok_mt$Prediction + (1.96 * sqrt(ok_mt$Variance))
 ok_mt$ci_lower <- ok_mt$Prediction - (1.96 * sqrt(ok_mt$Variance))
 
 plot(ok_mt$Prediction)
-#write_rds(ok_mt, "Output/minthreshinterpolation_allcobs.rds")
+write_rds(ok_mt, "InterpolationGWLevels//minthreshinterpolation_allcobs.rds")
 
 ba <- brick(d_avg$layer, ok_mt$Prediction)
 names(ba) <- c("Current GWL", "MT GWL")
 spplot(ba, sp.layout=gsps)
 
-# Remaining Questions
-# Should I create a buffer based on monitoring well points for each kriging set? And then compare areas covered?
 
 #### Remaining Questions ####
 # Should I create a buffer based on monitoring well points for each kriging set? And then compare areas covered?

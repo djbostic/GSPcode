@@ -38,6 +38,8 @@ wellz <- st_as_sf(wellz, coords = c("DECIMALLONGITUDE","DECIMALLATITUDE"), crs=4
 wells_in_gsps <- st_intersection(wellz, gsps)
 domesticwells_in_gsps <- filter(wells_in_gsps, grepl("domestic", PLANNEDUSEFORMERUSE, ignore.case = TRUE))
 
+#st_write(domesticwells_in_gsps, "DomesticWells/dw_gsp.shp")
+
 # see how many wells there are through the years
 domsub <- domesticwells_in_gsps %>% filter(year > 1965 & year < 2017)
 length(unique(domsub$WCRNUMBER))

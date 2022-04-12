@@ -5,62 +5,46 @@ library(raster)    # for raster objects
 library(sf)
 library(readr)
 
-# set working directory
-#setwd(dirname(rstudioapi::getSourceEditorContext()$path))
-setwd("/Volumes/GoogleDrive/My Drive/Graduate School/GSP_Analy/Organized_CnD/")
-
-# set coordinate reference system
-merc <- crs("+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0
-            +k=1.0 +units=m +nadgrids=@null +no_defs")
-
 # load data
 # GSP boundaries
+names(domesticwells_in_gsps)[names(domesticwells_in_gsps) == "WCRNUMBER"] <- "WCRNmbr"
+names(domesticwells_in_gsps)[names(domesticwells_in_gsps) == "TOTALCOMPLETEDDEPTH"] <- "TtlCmpD"
 
-gsp <- st_read("Boundaries/all_cobs/fixedgeometry_gspswithregion.shp") %>% filter(., region == "Coastal" & GSP_Name != "Las Posas")
-gsps <- st_read("Boundaries/all_cobs/fixedgeometry_gspswithregion.shp")
-gsp <- st_transform(gsp, merc) %>% filter(., region == "Coastal" & GSP_Name != "Las Posas")
-
-
-# domestic wells
-domwells_oswcr <- read_rds("Output/domesticwells_allcobs_90.rds")
-dw_gsp <- st_transform(domwells_oswcr, merc)
-dw_gsp <- st_intersection(dw_gsp, gsp)
-#names(dw_gsp)[names(dw_gsp) == "WCRNumber"] <- "WCRNmbr"
-
+dw_gsp <- domesticwells_in_gsps
+interp_boundary <- st_as_sf(interp_boundary)
 # buffer outline
-buffer_outline <- st_read("Output/buff_ts_coastal.shp")
-buffer_outline <- as(buffer_outline, "sf")
+interp_boundary
 
 # current gwl raster
-cgwl_raster <- raster("Output/1819avginterp_allcobs.tif")
+cgwl_raster <- d_avg
 cgwl_raster <- projectRaster(cgwl_raster, crs=merc)
 
 # minimum threshold raster
-mt_raster <- read_rds("Output/minthreshinterpolation_allcobs.rds")
+mt_raster <- read_rds("InterpolationGWLevels/minthreshinterpolation_allcobs.rds")
 mt_raster <- mt_raster$Prediction
 mt_raster <- projectRaster(mt_raster, crs=merc)
 
 # compare how many wells are within GSP area and interpolation boundary
-intial_data <- dw_gsp %>% group_by(GSP_Name, region) %>% summarise(Int=length(unique(WCRNmbr)), TCDa = mean(TtlCmpD, na.rm=TRUE))
+intial_data <- dw_gsp %>% group_by(GSP.ID, region) %>% summarise(Int=length(unique(WCRNmbr)), TCDa = mean(TtlCmpD, na.rm=TRUE))
 inti_data <- st_set_geometry(intial_data, NULL)
 
-buff <- st_intersection(dw_gsp, buffer_outline)
-buff_data <- buff %>% group_by(GSP_Name, region) %>% summarise(Buffer=length(unique(WCRNmbr)), TCDb = mean(TtlCmpD, na.rm=TRUE))
+buff <- st_intersection(dw_gsp, interp_boundary)
+buff_data <- buff %>% group_by(GSP.ID, region) %>% summarise(Buffer=length(unique(WCRNmbr)), TCDb = mean(TtlCmpD, na.rm=TRUE))
 buff_data <- st_set_geometry(buff_data, NULL)
 
 notinboth <- dw_gsp[!(dw_gsp$WCRNmbr %in% buff$WCRNmbr),]
 
-bi <- left_join(inti_data, buff_data, by="GSP_Name")
+bi <- left_join(inti_data, buff_data, by="GSP.ID")
 bi$percentcoverage <- bi$Buffer / bi$Int
 bif <- filter(bi, percentcoverage < .60)
 
-ggplot(bi, aes(x = reorder(GSP_Name, percentcoverage), y = percentcoverage, fill=factor(region.x))) + 
+ggplot(bi, aes(x = reorder(GSP.ID, percentcoverage), y = percentcoverage, fill=factor(region.x))) + 
   geom_bar(stat = "identity", width = 0.5) + 
   scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) + 
   labs(title = "Percent of domestic wells covered by GSP - Coastal Basins") + 
   xlab("GSP") + 
   ylab("Percent Covered") + 
-  scale_fill_manual("Region", values = c("San Joaquin Valley" = "#11854D", "Coastal" = "#111F85", "Central" = "#853911")) + 
+  scale_fill_manual("Region", values = c("Central Valley" = "#11854D", "Ventura" = "#111F85", "Indian Wells" = "#853911")) + 
   theme_minimal()
 
 
@@ -69,13 +53,13 @@ bi$pc <- ifelse(bi$percentcoverage <=0.6, "< 0.6",
                 ifelse(bi$percentcoverage > 0.6 & bi$percentcoverage <= 0.8, "0.6 - 0.8", 
                        ifelse(bi$percentcoverage > 0.8 & bi$percentcoverage <= 0.9, "0.8 - 0.9", 
                               ifelse(bi$percentcoverage >= 0.9, "0.9 - 1", "NA"))))
-percentmap <- left_join(gsp, bi, by="GSP_Name")
+percentmap <- left_join(gsp, bi, by="GSP.ID")
 bi <- na.omit(bi)
 
 library(RColorBrewer)
 ggplot() + 
   geom_sf(data=gsps, col='transparent') +
-  geom_sf(data=gsp, col="transparent") + 
+  #geom_sf(data=gsp, col="transparent") + 
   geom_sf(data=dw_gsp, cex=.1, col="cornflowerblue") +
   #geom_sf(data=tcddry, cex=.1, col="red")
   geom_sf(data=percentmap, aes(fill = pc)) +
@@ -84,7 +68,7 @@ ggplot() +
   scale_fill_manual(values = c("#bdc9e1", "#02818a","#f6eff7"), name= "Percent Covered") + 
   ggtitle("Percent of Domestic Wells Covered by GSP MTs")
 
-,"#67a9cf",
+#,"#67a9cf",
 # now that we know coverage, we move on to calculating what percent of domestic wells go dry 
 
 #### Remove wells above current groundwater level ####
@@ -194,27 +178,27 @@ ggplot() +
 
 
 #### pump box plot ####
-mtminmax <- mad %>% group_by(GSP_Name) %>% summarise(Max_MT = max(mt_at_dw, na.rm=TRUE), Min_MT = min(mt_at_dw, na.rm=TRUE)) %>% st_drop_geometry()
+mtminmax <- mad %>% group_by(GSP.ID) %>% summarise(Max_MT = max(mt_at_dw, na.rm=TRUE), Min_MT = min(mt_at_dw, na.rm=TRUE)) %>% st_drop_geometry()
 
 # select max pump location = 90th percentile
 # account for 90% of wells
-top_90p <- mad %>% count(GSP_Name) %>% filter(n > 300) %>% pull(GSP_Name)
+top_90p <- mad %>% count(GSP.ID) %>% filter(n > 300) %>% pull(GSP.ID)
   # sanity check
-nrow(filter(mad, GSP_Name %in% top_90p)) / nrow(mad) 
+nrow(filter(mad, GSP.ID %in% top_90p)) / nrow(mad) 
 # only show GSPs with 90% of all wells
-dw_90 <- filter(mad, GSP_Name %in% top_90p)
+dw_90 <- filter(mad, GSP.ID %in% top_90p)
 
 # only show wells that are dry in both CIs
 dwdri <- dw_90[dw_90$tcd_dry == "Failing", ]
 dw_90 <- dw_90 %>% filter(TtlCmpD < 500)
-mmsubset <- filter(mtminmax, GSP_Name %in% top_90p)
+mmsubset <- filter(mtminmax, GSP.ID %in% top_90p)
 
 ggplot() + 
-  geom_jitter(data = dw_90, aes(x=GSP_Name, y=TtlCmpD), col="grey80") +
-  geom_jitter(data = dwdri, aes(x=GSP_Name, y=TtlCmpD), col="#C85124") + 
+  geom_jitter(data = dw_90, aes(x=GSP.ID, y=TtlCmpD), col="grey80") +
+  geom_jitter(data = dwdri, aes(x=GSP.ID, y=TtlCmpD), col="#C85124") + 
   scale_y_reverse() + 
-  geom_rect(data = mmsubset, aes(xmin=GSP_Name, xmax=GSP_Name,ymin=Min_MT,ymax=Max_MT), fill="#900C3F", alpha=.6) + 
-  geom_errorbar(data=mmsubset, aes(x= GSP_Name, ymin = Min_MT, ymax = Max_MT), col="grey20") +
+  geom_rect(data = mmsubset, aes(xmin=GSP.ID, xmax=GSP.ID,ymin=Min_MT,ymax=Max_MT), fill="#900C3F", alpha=.6) + 
+  geom_errorbar(data=mmsubset, aes(x= GSP.ID, ymin = Min_MT, ymax = Max_MT), col="grey20") +
   labs(x = "GSP Name", y = "Depth to Pump Location",title = "Distribution of Pump Locations by GSP", subtitle = "Red = Dry Wells \nGray = Active Wells \nBlack = Range of MTs") +
   scale_x_discrete(labels = function(x) str_wrap(x, width = 10))
 #### Visualizations ####
