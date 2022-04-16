@@ -31,12 +31,9 @@ ggplot() +
   geom_sf(data=domesticwells_in_gsps, col="cornflowerblue", cex=.1) +
   theme_void()
 
-# subset points to gsp area
-dcv <- ds[gsps, ] 
-
-plot(gsp)
-points(dcv, cex=.2)
-
+# subset MTs by GSP area just to make sure
+dcv <- st_intersection(mts, gsps)
+dcv <- as_Spatial(dcv)
 xy_dcv <- coordinates(dcv)
 xy_dcv <- unique(xy_dcv)
 dim(xy_dcv)
@@ -63,7 +60,7 @@ xydf <- data.frame(xy_new)
 spxydf <- SpatialPointsDataFrame(coords = xydf, data = xydf, proj4string = merc)
 neighbors <- wdmin[far100]
 
-plot(gsp) 
+plot(gsps$geometry) 
 points(dcv, cex=0.1)
 points(xy_dcv[far100, ], col='blue', pch=20)
 points(xy_dcv[neighbors, ], col='red')
@@ -82,16 +79,27 @@ buffer_intersect <- function(x) {
   return(x) # return result
 }
 
-blist <- buffer_intersect(dcv)
+a <- gBuffer(dcv, width=5633, capStyle = "ROUND", joinStyle = "BEVEL") %>% st_as_sf(.)
+blist <- st_intersection(a, gsps)
 
-ca <- shapefile("Boundaries/ca/CA_State_TIGER2016.shp")
+ca <- st_read("Boundaries/cb_2018_us_state_500k/cb_2018_us_state_500k.shp") %>% filter(STUSPS == "CA")
+
 ca <- spTransform(ca, merc) 
 
-#plot(ca)
-plot(gsp, main = "Coverage of Minimum Threshold Network", col= "#be9897", border = "black")
-plot(blist, add = T, col = "grey90", lwd = 1)
+plot(ca$geometry,  main = "Coverage of Minimum Threshold Network", col="grey90")
+plot(gsps$geometry, col= "#D7907B", border = "black", add=T)
+plot(blist$geometry, add = T, col = "#0CBABA", lwd = 1)
 
-uall <- raster::union(blist)
+ggplot()+
+  geom_sf(data=ca, fill="grey90")+
+  geom_sf(data=gsps, fill="#468189", lwd=0)+
+  geom_sf(data=uall, fill="#0A2463", lwd=0)+
+  theme_void()+
+  labs(title="Coverage of the Minimum Threshold Representative \nMonitoring Network")+
+  theme(plot.title = element_text(size=16, hjust=0.5))
+
+
+uall <- st_union(blist)
 
 all_d <- dcv 
 # remove duplicate locations

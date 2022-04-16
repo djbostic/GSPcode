@@ -21,7 +21,7 @@ f <- spTransform(falll, merc) # change the crs of each points dataframe
 sp <- spTransform(springg, merc)
 
 # GSP outline
-interp_boundary <- as_Spatial(blist1)
+interp_boundary <- as_Spatial(a)
 interp_boundary <- spTransform(interp_boundary, merc) # transform central valley shapefile
 plot(interp_boundary)
 
@@ -276,6 +276,7 @@ plot(gsps, add=T)
 
 #### Interpolate MTs ####
 # subset pts to the central valley polygon
+mt <- filter(mts, InterpolationCategory == "Central Valley") %>% as_Spatial(.)
 mt$MT_dtw <- as.numeric(mt$MT_dtw) 
 mt@data <- filter(mt@data, MT_dtw > 0)
 
@@ -319,11 +320,12 @@ v_mt <- variogram(gs_mt,              # gstat object
 plot(v_mt)
 
 fve_mt <- fit.variogram(v_mt,         # takes `gstatVariogram` object
-                     vgm(.75,   # partial sill: semivariance at the range
+                     vgm(.95,   # partial sill: semivariance at the range
                          "Exp",     # linear model type
-                         200000,    # range: distance where model first flattens out
-                         0.1))      # nugget
+                         20168,    # range: distance where model first flattens out
+                         0.42))      # nugget
 
+fve_mt <- autofitVariogram(MT_dtw~1, mt_gsp_outline, "Exp")
 plot(autofitVariogram(MT_dtw~1, mt_gsp_outline, "Exp"))
 # plot variogram and fit
 plot(v_mt, fve_mt, main="Minimum Threshold Variogram")
@@ -352,7 +354,7 @@ ok_mt$ci_upper <- ok_mt$Prediction + (1.96 * sqrt(ok_mt$Variance))
 ok_mt$ci_lower <- ok_mt$Prediction - (1.96 * sqrt(ok_mt$Variance))
 
 plot(ok_mt$Prediction)
-write_rds(ok_mt, "InterpolationGWLevels//minthreshinterpolation_allcobs.rds")
+#write_rds(ok_mt, "InterpolationGWLevels/minthreshinterpolation_allcobs.rds")
 
 ba <- brick(d_avg$layer, ok_mt$Prediction)
 names(ba) <- c("Current GWL", "MT GWL")

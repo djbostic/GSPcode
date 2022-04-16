@@ -88,7 +88,7 @@ activedw <- buff
 mt_at_dw <- raster::extract(mt_raster, activedw) # intersect to get value of current water level at well points
 mad <- cbind(activedw, mt_at_dw) 
 mad <- mad[!is.na(mad$mt_at_dw), ] # remove wells where there is no current groundwater level value (wells are likely outside of interpolation area)
-mad$tcd_dry <- ifelse(mad$TtlCmpD <= mad$mt_at_dw, "Failing", "Active")
+mad$tcd_dry <- ifelse(mad$TOPOFPERFORATEDINTERVAL <= mad$mt_at_dw, "Failing", "Active")
 tcddry <- mad[mad$tcd_dry == "Failing", ]
 tcddry <- tcddry[!is.na(tcddry$WCRNmbr),]
 
