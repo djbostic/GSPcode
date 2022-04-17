@@ -19,10 +19,28 @@ wells <- read_csv("DomesticWells/oswcr_bulkdatadownload_04112022/OSWCR.csv")
 wellz <- wells %>% mutate(DATEWORKENDED = as.Date(DATEWORKENDED, "%m/%d/%Y"), year=year(DATEWORKENDED)) %>% filter(year>1960 & is.na(DECIMALLONGITUDE)==FALSE & is.na(DECIMALLATITUDE)==FALSE & !grepl("/", DECIMALLATITUDE) & !grepl("/", DECIMALLONGITUDE))
 
 wellz <- st_as_sf(wellz, coords = c("DECIMALLONGITUDE","DECIMALLATITUDE"), crs=4326) %>% st_transform(., crs=merc)
-wells_in_gsps <- st_intersection(wellz, gsps)
-domesticwells_in_gsps <- filter(wells_in_gsps, grepl("domestic", PLANNEDUSEFORMERUSE, ignore.case = TRUE))
+domesticwells_in_gsps <- filter(wellz, grepl("domestic", PLANNEDUSEFORMERUSE, ignore.case = TRUE))
 
-#st_write(domesticwells_in_gsps, "DomesticWells/dw_gsp.shp")
+# how many wells have TCDs, TOP of Screens, and Bottom of Screens?
+# TCD
+dw_tcd <- filter(domesticwells_in_gsps, is.na(TOTALCOMPLETEDDEPTH)==FALSE & TOTALCOMPLETEDDEPTH > 0)
+length(unique(dw_tcd$WCRNUMBER))
+
+dw_tos <- filter(domesticwells_in_gsps, is.na(TOPOFPERFORATEDINTERVAL)==FALSE & TOPOFPERFORATEDINTERVAL > 0)
+length(unique(dw_tos$WCRNUMBER))
+
+dw_bos <- filter(domesticwells_in_gsps, is.na(BOTTOMOFPERFORATEDINTERVAL)==FALSE & BOTTOMOFPERFORATEDINTERVAL > 0)
+length(unique(dw_bos$WCRNUMBER))
+
+dw_all <- filter(domesticwells_in_gsps, is.na(BOTTOMOFPERFORATEDINTERVAL)==FALSE & BOTTOMOFPERFORATEDINTERVAL > 0 &
+                   is.na(TOTALCOMPLETEDDEPTH)==FALSE & TOTALCOMPLETEDDEPTH > 0 &
+                   is.na(TOPOFPERFORATEDINTERVAL)==FALSE & TOPOFPERFORATEDINTERVAL > 0)
+length(unique(dw_all$WCRNUMBER))
+
+dw_all <- filter(dw_all, year > 1975 & year < 2017)
+
+domwells_gsps <- st_intersection(dw_all, gsps)
+st_write(domesticwells_in_gsps, "DomesticWells/dw_gsp.shp", append=FALSE)
 
 # see how many wells there are through the years
 

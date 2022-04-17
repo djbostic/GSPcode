@@ -22,7 +22,7 @@ sp <- spTransform(springg, merc)
 
 # GSP outline
 interp_boundary <- as_Spatial(a)
-interp_boundary <- spTransform(interp_boundary, merc) # transform central valley shapefile
+interp_boundary <- spTransform(buff_ts, merc) # transform central valley shapefile
 plot(interp_boundary)
 
 #### interpolation ####
@@ -276,7 +276,7 @@ plot(gsps, add=T)
 
 #### Interpolate MTs ####
 # subset pts to the central valley polygon
-mt <- filter(mts, InterpolationCategory == "Central Valley") %>% as_Spatial(.)
+mt <- filter(mts, region == "Central Valley") %>% as_Spatial(.)
 mt$MT_dtw <- as.numeric(mt$MT_dtw) 
 mt@data <- filter(mt@data, MT_dtw > 0)
 
@@ -320,10 +320,10 @@ v_mt <- variogram(gs_mt,              # gstat object
 plot(v_mt)
 
 fve_mt <- fit.variogram(v_mt,         # takes `gstatVariogram` object
-                     vgm(.95,   # partial sill: semivariance at the range
+                     vgm(.84,   # partial sill: semivariance at the range
                          "Exp",     # linear model type
-                         20168,    # range: distance where model first flattens out
-                         0.42))      # nugget
+                         38992,    # range: distance where model first flattens out
+                         0.34))      # nugget
 
 fve_mt <- autofitVariogram(MT_dtw~1, mt_gsp_outline, "Exp")
 plot(autofitVariogram(MT_dtw~1, mt_gsp_outline, "Exp"))
@@ -342,7 +342,7 @@ mu_original_mt <- mean(mean(exp(mt_gsp_outline$MT_dtw)))
 
 # these means differ by > 5%, thus we make another correction
 btt_mt <- bt_mt * (mu_original_mt/mu_bt_mt)
-kp_mt@data$var1.pred <- btt_mt                    # overwrite w/ correct vals 
+kp_mt@data$var1.pred <- bt_mt                    # overwrite w/ correct vals 
 kp_mt@data$var1.var  <- exp(kp_mt@data$var1.var)  # exponentiate the variance
 
 # covert to raster brick and crop to buff_ts
@@ -354,12 +354,17 @@ ok_mt$ci_upper <- ok_mt$Prediction + (1.96 * sqrt(ok_mt$Variance))
 ok_mt$ci_lower <- ok_mt$Prediction - (1.96 * sqrt(ok_mt$Variance))
 
 plot(ok_mt$Prediction)
-#write_rds(ok_mt, "InterpolationGWLevels/minthreshinterpolation_allcobs.rds")
+write_rds(ok_mt, "InterpolationGWLevels/minthreshinterpolation_allcobs.rds")
+
+k <- read_rds("InterpolationGWLevels/minthreshinterpolation_allcobs.rds")
+plot(k$Prediction)
 
 ba <- brick(d_avg$layer, ok_mt$Prediction)
 names(ba) <- c("Current GWL", "MT GWL")
 spplot(ba, sp.layout=gsps)
 
+plot(gsp)
+plot(ok_mt$Prediction, add=TRUE)
 
 #### Remaining Questions ####
 # Should I create a buffer based on monitoring well points for each kriging set? And then compare areas covered?

@@ -21,18 +21,18 @@ buffer_intersect_sf <- function(x) {
   return(x) # return result
 }
 
-blist <- st_buffer(domesticwells_in_gsps, dist=bt)
+blist <- st_buffer(domwells_gsps, dist=bt)
 blist1 <- st_union(blist)
 
-st_write(blist1, "Boundaries/domesticwellbuffer.shp")
+st_write(blist1, "Boundaries/domesticwellbuffer.shp", append=FALSE)
 
 ggplot() +
   geom_sf(data=blist1, col="grey10")+
-  geom_sf(data=domesticwells_in_gsps, col="cornflowerblue", cex=.1) +
+  geom_sf(data=domwells_gsps, col="cornflowerblue", cex=.1) +
   theme_void()
 
 # subset MTs by GSP area just to make sure
-dcv <- st_intersection(mts, gsps)
+dcv <- mts
 dcv <- as_Spatial(dcv)
 xy_dcv <- coordinates(dcv)
 xy_dcv <- unique(xy_dcv)
@@ -79,7 +79,8 @@ buffer_intersect <- function(x) {
   return(x) # return result
 }
 
-a <- gBuffer(dcv, width=5633, capStyle = "ROUND", joinStyle = "BEVEL") %>% st_as_sf(.)
+mt <- as_Spatial(mts)
+a <- gBuffer(mt, width=5633, capStyle = "ROUND", joinStyle = "BEVEL") %>% st_as_sf(.)
 blist <- st_intersection(a, gsps)
 
 ca <- st_read("Boundaries/cb_2018_us_state_500k/cb_2018_us_state_500k.shp") %>% filter(STUSPS == "CA")
@@ -111,7 +112,8 @@ bl <- gBuffer(gsp, width = bt, capStyle = "ROUND", joinStyle = "BEVEL") # townsh
 blc <- raster::intersect(bl, blist) # buffer list cropped to cv
 
 # calulate buffers
-buff_ts <- gBuffer(dcv, width = bt, capStyle = "ROUND", joinStyle = "BEVEL")# township level buffer
+sjvmts <- mts %>% filter(region == "Central Valley") %>% as_Spatial(.)
+buff_ts <- gBuffer(sjvmts, width = bt, capStyle = "ROUND", joinStyle = "BEVEL")# township level buffer
 #buff_ts <- raster::intersect(buff_ts, gsp)     # trim excess buffer to cv
 pc <- gArea(buff_ts) / gArea(gsp)      # percent coverage
 
@@ -126,13 +128,13 @@ buff_ts <- spTransform(buff_ts, merc)
 #write_rds(buff_ts, "Output/interpolation_buffer_ncvc.rds")
 
 # visualize and export
-plot(ca, col="white")
+plot(ca$geometry, col="white", main="Coverage of")
 #plot(gsp, add = T, col="#FCFCE4", cex.main = 1.5, cex.sub = 1.5,
    #  main = "Areal Coverage", 
     # sub = paste0("Coverage = ", round(pc*100, 2), "%", "\n", 
      #             "(nwell = ", formatC(nrow(ad), big.mark = ","),")"))
 plot(gsp, col="grey90")
-plot(buff_ts, col = "#BDD9FA", add = T) # the buffer
+plot(uall, col = "#BDD9FA", add = T) # the buffer
 #plot(uni, col = "grey90", add = T) # the buffer
 #plot(ad, add=T, pch = 19, cex = .1, col = "cornflowerblue")
 plot(dcv, add=T, pch = 19, cex = .1, col = "#073B78") # points that made the buffer

@@ -7,16 +7,16 @@ library(readr)
 
 # load data
 # GSP boundaries
-names(domesticwells_in_gsps)[names(domesticwells_in_gsps) == "WCRNUMBER"] <- "WCRNmbr"
-names(domesticwells_in_gsps)[names(domesticwells_in_gsps) == "TOTALCOMPLETEDDEPTH"] <- "TtlCmpD"
+names(domwells_gsps)[names(domwells_gsps) == "WCRNUMBER"] <- "WCRNmbr"
+names(domwells_gsps)[names(domwells_gsps) == "TOTALCOMPLETEDDEPTH"] <- "TtlCmpD"
 
-dw_gsp <- domesticwells_in_gsps
+dw_gsp <- domwells_gsps %>% filter(region == "Central Valley")
 interp_boundary <- st_as_sf(interp_boundary)
 # buffer outline
 interp_boundary
 
 # current gwl raster
-cgwl_raster <- d_avg
+cgwl_raster <- read_rds("InterpolationGWLevels/cgwl_raster.rds")
 cgwl_raster <- projectRaster(cgwl_raster, crs=merc)
 
 # minimum threshold raster
@@ -94,16 +94,16 @@ tcddry <- tcddry[!is.na(tcddry$WCRNmbr),]
 
 length(unique(tcddry$WCRNmbr)) / length(unique(mad$WCRNmbr)) # percent of wells that go dry in whole data set based on tcd
 
-tcdbygsp <- mad %>% group_by(GSP_Name, tcd_dry) %>% summarise(num_tcd = length(unique(WCRNmbr))) %>% filter(., tcd_dry == "Failing")
+tcdbygsp <- mad %>% group_by(GSP.ID, tcd_dry) %>% summarise(num_tcd = length(unique(WCRNmbr))) %>% filter(., tcd_dry == "Failing")
 st_geometry(tcdbygsp) <- NULL
 t <- as.data.frame(tcdbygsp)
 
-totalnums <- mad %>% group_by(GSP_Name) %>% summarise(numdw = length(unique(WCRNmbr))) 
+totalnums <- mad %>% group_by(GSP.ID) %>% summarise(numdw = length(unique(WCRNmbr))) 
 st_geometry(totalnums) <- NULL
 tn <- as.data.frame(totalnums)
 
 
-all <- left_join(tn, t, by="GSP_Name")
+all <- left_join(tn, t, by="GSP.ID")
 
 all$tcd_perc <- all$num_tcd / all$numdw
 
@@ -144,9 +144,9 @@ ggplot(df.long, aes(reorder(name,value),value,fill=Region))+
 
 #### raster map ####
 # rasterize dry wells
-r <- raster(buffer_outline)
+r <- raster(buff_ts)
 res(r) <- 1610*6 # township-level grids (1,609 meters in a mile)
-r <- rasterize(buffer_outline, r)
+r <- rasterize(buff_ts, r)
 plot(r, col="grey90", lwd=10)
 quads <- as(r, "SpatialPolygons")
 
@@ -163,13 +163,13 @@ pld$dw_pl <- ifelse(pld$layer <=10, "0 - 2",
 
 plot(pld$geometry)
 plot(quads, add=T, col="NA", lwd=.1)
-plot(gsp$geometry, add=T, col="NA")
+plot(gsp, add=T, col="NA")
 
-ints <- st_intersection(pld, st_make_valid(gsp))
+ints <- st_intersection(pld, st_make_valid(sjvgsp))
 ints$dw_pl <- factor(ints$dw_pl, levels=c("0 - 2", "11 - 20", "21 - 40", "41 - 60"))
 ggplot() +
-  geom_sf(data=gsps, fill="grey90", lwd=.01) +
-  geom_sf(data=gsp, fill = "grey100", col="black", lwd=0.5) + 
+  geom_sf(data=sjvgsp, fill="grey90", lwd=.01) +
+  #geom_sf(data=gsp, fill = "grey100", col="black", lwd=0.5) + 
   geom_sf(data=ints, aes(fill=dw_pl))  +
   geom_sf(data=tcddry, cex=.5, col="#9C331B") +
   scale_fill_brewer(palette = "OrRd") + 

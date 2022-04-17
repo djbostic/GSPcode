@@ -47,9 +47,28 @@ ggplot()+
   theme_void(base_size = 16)
 
 
+mts <- st_intersection(mts, gsps)
+sjvmts <- mts %>% filter(region == "Central Valley") %>% st_write(., "MTs/sjvMTs.shp")
+coastalmts <- mts %>% filter(region == "Ventura") %>% st_write(., "MTs/coastalMTs.shp")
+indianwellsmts <- mts %>% filter(region == "Indian Wells") %>% st_write(., "MTs/indainwellsMTs.shp")
+cuyamamts <- mts %>% filter(region == "Cuyama") %>% st_write(., "MTs/cuyamaMTs.shp")
+
+mt_gsp <- mts %>% st_drop_geometry(.) %>% dplyr::select(BASIN, GSP_Name) %>% unique(.)
+write.csv(mt_gsp, "mtsingsps.csv")
+
+gsps <- filter(gsps, gsps$BASIN %in% mts$BASIN)
+
 sjvgsp <- filter(gsps, region == "Central Valley")
+sjvgsp <- st_cast(sjvgsp, "MULTIPOLYGON")
+#st_write(sjvgsp, "CentralValleyGSPs.shp")
+
 coastalgsp <- filter(gsps, region== "Ventura")
+#st_write(coastalgsp, "CoastalGSPs.shp")
+
 indianwellsgsp <- filter(gsps, region == "Indian Wells")
+#st_write(indianwellsgsp, "IndianWellsGSP.shp")
+
 cuyamagsp <- filter(gsps, region=="Cuyama")
+#st_write(cuyamagsp, "CuyamaSantaCruz.shp")
 
 gsp <- as_Spatial(gsps)
