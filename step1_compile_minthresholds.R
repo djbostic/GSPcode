@@ -18,7 +18,7 @@ gsps <- st_read(here("Boundaries/GSP_submitted/GSA_Master.shp"))
 gsps <- st_transform(gsps, merc)
 
 # load MTs
-mn <- read.csv("2020_2022_MTs.csv") %>% filter(is.na(Long)==FALSE & is.na(Lat)==FALSE)
+mn <- read.csv("MTs/2020_2022_MTs.csv") %>% filter(is.na(Long)==FALSE & is.na(Lat)==FALSE & is.na(MT_dtw)==FALSE)
 mts <- st_as_sf(mn, coords = c("Long","Lat"), crs=4326) %>% st_transform(., crs=merc)
 
 # plot to make sure everything looks okay
